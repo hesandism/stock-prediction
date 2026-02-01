@@ -90,3 +90,57 @@ def convert_numeric_columns(df:pd.DataFrame, numeric_cols: list[str]):
 
 
     return df
+
+
+def handle_missing_values(df:pd.DataFrame, price_cols: list[str], volume_col: str = "volume"):
+    # Prices -> forward filling method
+    # Volume -> fill missings with 0
+
+    df = df.copy()
+
+    existing_price_cols = [col for col in price_cols if col in df.columns]
+
+    if existing_price_cols:
+        df[existing_price_cols] = df[existing_price_cols].ffill()
+        df= df.dropna(subset=existing_price_cols)
+
+    if volume_col in df.columns:
+        df[volume_col] = df[volume_col].fillna(0)
+
+    return df
+
+
+def remove_invalid_rows(df:pd.DataFrame,open_col="open", high_col="high", low_col="low", close_col="price", volume_col="volume"):
+    df = df.copy()
+
+    #prices > 0
+    for col in [open_col,high_col,low_col,close_col,volume_col]:
+        if col in df.columns:
+            df = df[df[col]>0]
+
+    
+    #high price >= low price
+    if high_col in df.columns and low_col in df.columns:
+        df = df[df[high_col]>=df[low_col]]
+
+    if volume_col in df.columns:
+        df = df[df[volume_col]>=0]
+
+    return df.reset_index(drop=True)
+
+
+
+def set_date_index(df:pd.DataFrame, date_col:str="date"):
+    df = df.copy()
+    df = df.set_index(keys=date_col)
+    df = df.sort_index()
+
+    if not df.index.unique():
+        raise ValueError(f"Date index is not unique. Search for duplicate date entries.")
+
+    return df
+
+
+
+
+
