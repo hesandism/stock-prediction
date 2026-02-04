@@ -1,8 +1,8 @@
 import pandas as pd
 from pathlib import Path
 
-raw_file = Path("data/raw/TeleCom_2009_2023_Daily.csv")
-output_file = Path("data/processed/slt_daily_clean.csv")
+raw_file = Path("data/raw/Toyota_Stock_1980_2025.csv")
+output_file = Path("data/processed/Toyota_clean.csv")
 
 
 def parse_suffix_number(x):
