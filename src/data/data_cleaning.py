@@ -244,7 +244,7 @@ def create_prediction_targets(df: pd.DataFrame, close_col: str = "close"):
 
 def save_processed_data(df: pd.DataFrame, output_path: Path):
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output_path)
+    df.to_csv(output_path, index=True, index_label="date")
     print(f"\nSaved cleaned dataset to: {output_path}")
 
 
@@ -252,8 +252,9 @@ def main():
  
     df = load_raw_data(raw_file)
 
-   
-    inspect_data(df)
+    DEBUG = False
+    if DEBUG:
+        inspect_data(df)
 
   
     df = standardize_column_names(df)
@@ -280,9 +281,6 @@ def main():
 
     
     df = set_date_index(df, date_col="date")
-
-    
-    df = create_prediction_targets(df, close_col="close")
 
     
     save_processed_data(df, output_file)
