@@ -50,8 +50,42 @@ def add_features(df:pd.DataFrame):
     return df
 
 
+def finalize(df:pd.DataFrame):
+    df = df.copy()
+
+    df = df.dropna()
+
+    df = df.replace([np.inf, -np.inf], np.nan).dropna()
+
+    return df
 
 
+def build_feature_dataset(clean_path:Path, out_path:Path):
+    df = pd.read_csv(clean_path)
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.sort_values("date").reset_index(drop=True)
+
+    df = add_targets(df)
+    df = add_features(df)
+    df = finalize(df)
+
+    df.to_csv(out_path, index=False)
+    return out_path
+
+
+
+def main():
+    clean_path = PROCESSED_DIR/"Toyota_clean.csv"
+    out_path = FEATURES_DIR/"Toyota_features.csv"
+
+    saved_path = build_feature_dataset(clean_path, out_path)
+    print(f"Saved feature dataset: {saved_path}")
+
+
+if __name__ == "__main__":
+    main()
+
+    
 
 
 
