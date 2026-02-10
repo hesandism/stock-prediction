@@ -3,29 +3,41 @@ import pandas as pd
 import xgboost as xgb
 
 from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 from src.config import FEATURES_DIR
 
 
+def rmse(y_true, y_pred):
+    return float(np.sqrt(mean_squared_error(y_true, y_pred)))
+
+
 def main():
+   
     path = FEATURES_DIR / "Toyota_features.csv"
     df = pd.read_csv(path)
 
-    y_col = "target_direction"
-    leak_cols = {"date", "target_next_close", "target_next_return", "target_direction"}
+    
+    y_col = "target_next_close"
+    leak_cols = {
+        "date",
+        "target_next_close",
+        "target_next_return",
+        "target_direction",
+    }
+
+    X = df.drop(columns=[c for c in leak_cols if c in df.columns], errors="ignore")
+    y = df[y_col]
 
     
-    X = df.drop(columns=[c for c in leak_cols if c in df.columns], errors="ignore")
-    y = df[y_col].astype(int)
-
     data = pd.concat([X, y], axis=1).dropna()
     X = data.drop(columns=[y_col])
-    y = data[y_col].astype(int)
+    y = data[y_col].astype(float)
 
-   
+    
     test_size = valid_size = 0.15
     n = len(X)
+
     test_split_idx = int(n * (1 - test_size))
     valid_split_idx = int(n * (1 - (test_size + valid_size)))
 
@@ -43,20 +55,28 @@ def main():
     print(f"Valid rows: {len(X_valid)}")
     print(f"Test rows : {len(X_test)}")
 
+   
+    if "close" in X_test.columns:
+        baseline_pred = X_test["close"].astype(float).values
+        print("\n===== BASELINE (Close(t+1)=Close(t)) =====")
+        print("MAE :", mean_absolute_error(y_test, baseline_pred))
+        print("RMSE:", rmse(y_test, baseline_pred))
+    else:
+        print("\n[Baseline skipped] 'close' column not found in features.")
+
     
-    base_model = xgb.XGBClassifier(
-        objective="binary:logistic",
-        eval_metric="logloss",
+    base_model = xgb.XGBRegressor(
+        objective="reg:squarederror",
         tree_method="hist",
         device="cuda",
-        n_jobs=-1,
         random_state=42,
+        n_jobs=-1,
     )
 
     param_dist = {
         "max_depth": [3, 4, 5, 6, 7],
         "learning_rate": [0.01, 0.05, 0.1],
-        "n_estimators": [100, 200, 400],
+        "n_estimators": [200, 400, 800],
         "subsample": [0.7, 0.8, 1.0],
         "colsample_bytree": [0.7, 0.8, 1.0],
         "min_child_weight": [1, 5, 10],
@@ -70,37 +90,36 @@ def main():
         estimator=base_model,
         param_distributions=param_dist,
         n_iter=12,
-        scoring="roc_auc",
+        scoring="neg_mean_absolute_error",  
         cv=tscv,
         verbose=2,
         random_state=42,
-        n_jobs=1, 
-        error_score="raise", 
+        n_jobs=1,            
+        error_score="raise",
     )
 
+    
     search.fit(X_train, y_train)
 
     print("\nBest params from search:")
     for k, v in search.best_params_.items():
         print(f"  {k}: {v}")
 
-  
     best_model = search.best_estimator_
 
-
+   
     X_train_full = pd.concat([X_train, X_valid], axis=0)
     y_train_full = pd.concat([y_train, y_valid], axis=0)
 
     best_model.fit(X_train_full, y_train_full)
 
-    # Evaluate
-    proba = best_model.predict_proba(X_test)[:, 1]
-    pred = (proba >= 0.5).astype(int)
+    
+    pred = best_model.predict(X_test)
 
-    print("\nAccuracy:", accuracy_score(y_test, pred))
-    print("ROC-AUC:", roc_auc_score(y_test, proba))
-    print("\nConfusion matrix:\n", confusion_matrix(y_test, pred))
-    print("\nClassification report:\n", classification_report(y_test, pred))
+    print("\n===== XGBOOST REGRESSOR (Next Close) =====")
+    print("MAE :", mean_absolute_error(y_test, pred))
+    print("RMSE:", rmse(y_test, pred))
+    print("R2  :", r2_score(y_test, pred))
 
 
 if __name__ == "__main__":
