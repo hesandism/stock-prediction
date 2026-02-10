@@ -5,3 +5,4 @@ matplotlib
 yfinance
 jupyter
 pytest
+xgboost>=2.0.0
